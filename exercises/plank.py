@@ -2,113 +2,81 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import time
+from angle_utils import calculate_angle
 
-mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
-
-def calculate_angle(a, b, c):
-
-    a = np.array(a)
-    b = np.array(b)
-    c = np.array(c)
-
-    radians = np.arctan2(c[1]-b[1], c[0]-b[0]) - np.arctan2(a[1]-b[1], a[0]-b[0])
-    angle = np.abs(radians * 180 / np.pi)
-
-    if angle > 180:
-        angle = 360 - angle
-
-    return angle
-
-
-cap = cv2.VideoCapture(0)
-
+# Global variables
 plank_start = None
 plank_time = 0
 stable_start = None
 
+def reset():
+    global plank_start, plank_time, stable_start
+    plank_start = None
+    plank_time = 0
+    stable_start = None
 
-with mp_pose.Pose(min_detection_confidence=0.7,
-                  min_tracking_confidence=0.7) as pose:
+def update(image, results):
+    global plank_start, plank_time, stable_start
 
-    while cap.isOpened():
+    if not results.pose_landmarks:
+        return image
 
-        ret, frame = cap.read()
-        if not ret:
-            break
+    if results.pose_landmarks:
+        landmarks = results.pose_landmarks.landmark
 
-        image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = pose.process(image)
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        # LEFT
+        l_shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,
+                      landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
 
-        if results.pose_landmarks:
+        l_hip = [landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].x,
+                 landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].y]
 
-            landmarks = results.pose_landmarks.landmark
+        l_ankle = [landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].x,
+                   landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y]
 
-            # LEFT BODY
-            l_shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,
-                          landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
+        # RIGHT
+        r_shoulder = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,
+                      landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
 
-            l_hip = [landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].x,
-                     landmarks[mp_pose.PoseLandmark.LEFT_HIP.value].y]
+        r_hip = [landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].x,
+                 landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].y]
 
-            l_ankle = [landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].x,
-                       landmarks[mp_pose.PoseLandmark.LEFT_ANKLE.value].y]
+        r_ankle = [landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x,
+                   landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].y]
 
-            # RIGHT BODY
-            r_shoulder = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,
-                          landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
+        # Angles
+        left_angle = calculate_angle(l_shoulder, l_hip, l_ankle)
+        right_angle = calculate_angle(r_shoulder, r_hip, r_ankle)
 
-            r_hip = [landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].x,
-                     landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].y]
+        body_angle = (left_angle + right_angle) / 2
 
-            r_ankle = [landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x,
-                       landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].y]
+        # Logic
+        if 160 < body_angle < 200:
 
-            # Angles
-            left_angle = calculate_angle(l_shoulder, l_hip, l_ankle)
-            right_angle = calculate_angle(r_shoulder, r_hip, r_ankle)
+            if stable_start is None:
+                stable_start = time.time()
 
-            body_angle = (left_angle + right_angle) / 2
+            if time.time() - stable_start > 1:
 
-            # Correct plank position
-            if 160 < body_angle < 200:
+                if plank_start is None:
+                    plank_start = time.time()
 
-                if stable_start is None:
-                    stable_start = time.time()
+                plank_time = int(time.time() - plank_start)
 
-                # wait 1 second before starting plank timer
-                if time.time() - stable_start > 1:
+        else:
+            stable_start = None
+            plank_start = None
+            plank_time = 0
 
-                    if plank_start is None:
-                        plank_start = time.time()
-
-                    plank_time = int(time.time() - plank_start)
-
-            else:
-                stable_start = None
-                plank_start = None
-                plank_time = 0
-
+        # UI
         cv2.rectangle(image, (0,0), (260,80), (245,117,16), -1)
 
         cv2.putText(image, "PLANK TIME", (10,20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,0), 1)
 
-        cv2.putText(image, str(plank_time)+" s", (10,70),
+        cv2.putText(image, str(plank_time) + " s", (10,70),
                     cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 2)
 
-        mp_drawing.draw_landmarks(
-            image,
-            results.pose_landmarks,
-            mp_pose.POSE_CONNECTIONS)
-
-        cv2.imshow("Plank Tracker", image)
-
-        if cv2.waitKey(10) & 0xFF == ord('q'):
-            break
-
-
-cap.release()
-cv2.destroyAllWindows()
+    return image

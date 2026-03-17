@@ -1,29 +1,9 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-import time
+from angle_utils import calculate_angle
 
-pTime = 0
-
-mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
-
-
-def calculate_angle(a, b, c):
-    a = np.array(a)
-    b = np.array(b)
-    c = np.array(c)
-
-    radians = np.arctan2(c[1]-b[1], c[0]-b[0]) - np.arctan2(a[1]-b[1], a[0]-b[0])
-    angle = np.abs(radians * 180.0 / np.pi)
-
-    if angle > 180:
-        angle = 360 - angle
-
-    return angle
-
-
-cap = cv2.VideoCapture(0)
 
 # Curl counters
 left_counter = 0
@@ -32,34 +12,25 @@ left_stage = None
 right_counter = 0
 right_stage = None
 
+def reset():
+    global left_counter, left_stage, right_counter, right_stage
+    left_counter = 0
+    left_stage = None
 
-with mp_pose.Pose(min_detection_confidence=0.7,
-                  min_tracking_confidence=0.7) as pose:
+    right_counter = 0
+    right_stage = None
 
-    while cap.isOpened():
+def update(image, results):
+        global left_counter, left_stage, right_counter, right_stage
 
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        # Convert BGR → RGB
-        image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        image.flags.writeable = False
-
-        # Pose detection
-        results = pose.process(image)
-
-        # Convert RGB → BGR
-        image.flags.writeable = True
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
-        h, w, _ = image.shape
+        if not results.pose_landmarks:
+            return image
 
         if results.pose_landmarks:
-
+            h, w, _ = image.shape
             landmarks = results.pose_landmarks.landmark
 
-            # ---------------- LEFT ARM ----------------
+            # LEFT ARM
 
             LEFT_SHOULDER = mp_pose.PoseLandmark.LEFT_SHOULDER.value
             LEFT_ELBOW = mp_pose.PoseLandmark.LEFT_ELBOW.value
@@ -87,7 +58,7 @@ with mp_pose.Pose(min_detection_confidence=0.7,
                 left_counter += 1
 
 
-            # ---------------- RIGHT ARM ----------------
+            # RIGHT ARM
 
             RIGHT_SHOULDER = mp_pose.PoseLandmark.RIGHT_SHOULDER.value
             RIGHT_ELBOW = mp_pose.PoseLandmark.RIGHT_ELBOW.value
@@ -115,48 +86,20 @@ with mp_pose.Pose(min_detection_confidence=0.7,
                 right_counter += 1
 
 
-        # ---------------- UI PANEL ----------------
+            # UI PANEL
 
-        cv2.rectangle(image, (0,0), (300,80), (245,117,16), -1)
+            cv2.rectangle(image, (0,0), (300,80), (245,117,16), -1)
 
-        cv2.putText(image, "LEFT REPS", (10,20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1)
+            cv2.putText(image, "LEFT REPS", (10,20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1)
 
-        cv2.putText(image, str(left_counter), (10,60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 2)
+            cv2.putText(image, str(left_counter), (10,60),
+                        cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 2)
 
-        cv2.putText(image, "RIGHT REPS", (150,20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1)
+            cv2.putText(image, "RIGHT REPS", (150,20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 1)
 
-        cv2.putText(image, str(right_counter), (150,60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 2)
+            cv2.putText(image, str(right_counter), (150,60),
+                        cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 2)
 
-
-        # ---------------- FPS ----------------
-
-        cTime = time.time()
-        fps = 1 / (cTime - pTime)
-        pTime = cTime
-
-        cv2.putText(image, f'FPS: {int(fps)}', (450,50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
-
-
-        # Draw pose skeleton
-        mp_drawing.draw_landmarks(
-            image,
-            results.pose_landmarks,
-            mp_pose.POSE_CONNECTIONS,
-            mp_drawing.DrawingSpec(color=(245,117,66), thickness=2, circle_radius=2),
-            mp_drawing.DrawingSpec(color=(245,66,240), thickness=2, circle_radius=2)
-        )
-
-
-        cv2.imshow('Mediapipe Feed', image)
-
-        if cv2.waitKey(10) & 0xFF == ord('q'):
-            break
-
-
-cap.release()
-cv2.destroyAllWindows()
+        return image
