@@ -21,6 +21,32 @@ Supported exercises:
 
 ---
 
+## How It Works
+
+1. **Webcam Capture**  
+   - The application captures real-time video frames from webcam.
+
+2. **Pose Detection with MediaPipe**  
+   - MediaPipe detects **33 key body landmarks** such as shoulders, elbows, hips, knees, and ankles.  
+   - Each landmark provides normalized 2D coordinates for precise tracking.
+
+3. **Joint Angle Calculation**  
+   - Using the coordinates of relevant landmarks, the system calculates **joint angles** for elbows, knees, hips, etc.  
+   - These angles determine the position of each body part during an exercise.
+
+4. **Pose Evaluation & Stage Detection**  
+   - The system checks whether the pose matches the correct form for the selected exercise.  
+   - It tracks the **stage of the movement** (e.g., “up” or “down”).
+
+5. **Repetition Counting**  
+   - A repetition is counted when a full movement cycle is completed correctly (e.g., arm curls from “down” to “up”).  
+   - Counts are updated in real-time and displayed on the screen.
+
+6. **User Interface Overlay**  
+   - The webcam feed shows **angles, repetition count, and stage** directly on the video for instant feedback.
+
+---
+
 ## Installation
 
 ### 1. Clone the repository
