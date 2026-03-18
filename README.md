@@ -89,4 +89,5 @@ ai-virtual-gym-tracker/
 ## Author
 
 **Baya Mezghani** 
+
 📧 baya.mezghani@ensi-uma.tn
